@@ -9,6 +9,7 @@ Useful when migrating to a new server setup while keeping Overseer on the old se
 import requests
 import json
 import sys
+import time
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 
@@ -18,6 +19,15 @@ API_TOKEN = "your-api-token-here"
 
 # Set to True to actually re-request items (USE WITH CAUTION!)
 DRY_RUN = True
+
+# Skip confirmation prompt in live mode (USE WITH CAUTION!)
+SKIP_CONFIRMATION = False
+
+# Request throttling - delay in seconds between requests (helps avoid API overload)
+REQUEST_DELAY = 1.0
+
+# For testing - limit number of requests (set to None for no limit)
+TEST_LIMIT = None
 
 # Filtering options (set to None to disable filtering)
 # Filter by date - only re-request items requested before this date (YYYY-MM-DD format)
@@ -245,7 +255,7 @@ class OverseerAPI:
             print(f"      Request ID: {req.get('id', 'unknown')}")
             print()
     
-    def create_request(self, media_id: int, media_type: str) -> bool:
+    def create_request(self, media_id: int, media_type: str, title: str = "Unknown Title") -> bool:
         """Create a new request for the specified media"""
         if DRY_RUN:
             print(f"   [DRY RUN] Would re-request {media_type} with media ID: {media_id}")
@@ -266,11 +276,20 @@ class OverseerAPI:
                 print(f"   ✅ Successfully re-requested {media_type} (ID: {media_id})")
                 return True
             else:
-                print(f"   ❌ Failed to re-request {media_type} (ID: {media_id}): HTTP {response.status_code}")
+                # Try to get more detailed error info
+                error_detail = "Unknown error"
+                try:
+                    error_data = response.json()
+                    error_detail = error_data.get('message', error_data.get('error', str(error_data)))
+                except:
+                    error_detail = response.text[:100] if response.text else "No error details"
+                
+                print(f"   ❌ Failed to re-request {media_type} '{title}' (ID: {media_id})")
+                print(f"      HTTP {response.status_code}: {error_detail}")
                 return False
                 
         except Exception as e:
-            print(f"   ❌ Error re-requesting {media_type} (ID: {media_id}): {e}")
+            print(f"   ❌ Error re-requesting {media_type} '{title}' (ID: {media_id}): {e}")
             return False
 
 def main():
@@ -343,29 +362,44 @@ def main():
         print("This is a dry run. No actual requests will be made.")
         print("Set DRY_RUN = False in the script to enable actual re-requesting.")
     else:
-        response = input(f"Do you want to re-request all {len(filtered_requests)} items? (yes/no): ")
-        if response.lower() != 'yes':
-            print("Aborted by user.")
-            sys.exit(0)
+        if SKIP_CONFIRMATION:
+            print(f"⚠️ SKIP_CONFIRMATION=True: Proceeding to re-request {len(filtered_requests)} items...")
+        else:
+            response = input(f"Do you want to re-request all {len(filtered_requests)} items? (yes/no): ")
+            if response.lower() != 'yes':
+                print("Aborted by user.")
+                sys.exit(0)
+    
+    # Apply test limit if set
+    requests_to_process = filtered_requests
+    if TEST_LIMIT is not None:
+        requests_to_process = filtered_requests[:TEST_LIMIT]
+        print(f"\n🧪 TEST MODE: Processing only first {len(requests_to_process)} requests")
     
     # Process re-requests
-    print(f"\n🔄 Processing re-requests for {len(filtered_requests)} items...")
+    print(f"\n🔄 Processing re-requests for {len(requests_to_process)} items...")
+    if not DRY_RUN:
+        print(f"⏳ Adding {REQUEST_DELAY}-second delay between requests to avoid API overload...")
     
     success_count = 0
     failed_count = 0
     
-    for req in filtered_requests:
+    for i, req in enumerate(requests_to_process, 1):
         media_info = req.get('media', {})
         media_id = media_info.get('id')
         media_type = req.get('type', 'movie')  # Default to movie
         title = media_info.get('title', 'Unknown Title')
         
         if media_id:
-            print(f"Processing: {title}")
-            if api.create_request(media_id, media_type):
+            print(f"Processing {i}/{len(requests_to_process)}: {title}")
+            if api.create_request(media_id, media_type, title):
                 success_count += 1
             else:
                 failed_count += 1
+                
+            # Add delay between requests to avoid overwhelming the API (except in dry run)
+            if not DRY_RUN and i < len(requests_to_process):
+                time.sleep(REQUEST_DELAY)
         else:
             print(f"⚠️  Skipping {title}: No media ID found")
             failed_count += 1
@@ -373,7 +407,9 @@ def main():
     print(f"\n📊 Re-request Summary:")
     print(f"   ✅ Successful: {success_count}")
     print(f"   ❌ Failed: {failed_count}")
-    print(f"   📝 Total processed: {len(filtered_requests)}")
+    print(f"   📝 Total processed: {len(requests_to_process)}")
+    if TEST_LIMIT is not None:
+        print(f"   🧪 Test mode: Only processed first {TEST_LIMIT} of {len(filtered_requests)} total requests")
 
 if __name__ == "__main__":
     main() 

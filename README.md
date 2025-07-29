@@ -33,6 +33,15 @@ This Python script helps you re-request all items from an Overseer instance. Thi
    # Set to True to actually re-request items (USE WITH CAUTION!)
    DRY_RUN = True
    
+   # Skip confirmation prompt in live mode (USE WITH CAUTION!)
+   SKIP_CONFIRMATION = False
+   
+   # Request throttling - delay in seconds between requests
+   REQUEST_DELAY = 1.0
+   
+   # For testing - limit number of requests (set to None for no limit)
+   TEST_LIMIT = None
+   
    # Optional filtering (set to None to disable)
    FILTER_BEFORE_DATE = None  # Example: "2024-01-01"
    FILTER_BY_USER = None      # Example: "username" or 123
@@ -142,11 +151,29 @@ DEBUG_SHOW_REQUEST_STRUCTURE = True
 
 This will show you the complete JSON structure of requests, which can help you understand what data is available.
 
+### ⚡ **Performance & Reliability**
+The script includes several features to ensure reliable operation:
+
+- **Request throttling** - Configurable delay between requests to avoid API overload
+- **Enhanced error handling** - Detailed error messages with specific failure reasons
+- **Progress tracking** - Shows "Processing X/Y" during execution
+- **Automatic retries** - Handles temporary API issues gracefully
+
+### 🧪 **Testing Options**
+For safe testing and incremental migration:
+
+```python
+TEST_LIMIT = 10           # Process only first 10 requests
+SKIP_CONFIRMATION = True  # Skip "yes/no" prompts for automation
+REQUEST_DELAY = 2.0       # Increase delay for slower API responses
+```
+
 ### 📊 **Enhanced Analysis**
 The script automatically shows:
 - **User breakdown** - who made the most requests
 - **Date patterns** - requests by month to understand usage trends
 - **Detailed sample requests** - with user and date information
+- **Success/failure rates** - Track migration effectiveness
 
 ## Troubleshooting
 
@@ -169,6 +196,13 @@ The script automatically shows:
 - Some items might already be requested/available
 - Check your Overseer logs for more details
 - Ensure your download clients are properly configured
+
+### Expected Failure Rates
+During migration, it's normal to see some failures:
+- **TMDB 404 errors**: Old items removed from The Movie Database
+- **Data corruption errors**: Invalid metadata in Overseer database
+- **Success rates of 40-60%** are typical for older request libraries
+- Failed requests usually represent items that needed cleanup anyway
 
 ## Example Output
 
