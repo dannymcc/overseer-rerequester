@@ -1,25 +1,42 @@
 # Overseer Re-request Script
 
-This Python script helps you re-request all items from an Overseer instance. This is particularly useful when migrating your media server setup to a new machine while keeping Overseer on the old server.
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/d3hkz6gwle)
 
-## Features
+A Python script that helps you re-request all items from an Overseer instance with advanced filtering and migration capabilities. Perfect for migrating your media server setup to a new machine while keeping Overseer on the old server.
 
-- 🔍 **Query all requests** from your Overseer instance
-- 📊 **Analyze requests** by status, media type, user, and date
-- 🔄 **Re-request items** to trigger downloads on your new setup
-- 🛡️ **Dry run mode** to test before making actual changes
-- ⚙️ **Easy configuration** with variables at the top of the script
-- 📅 **Date filtering** - only re-request items from before a specific date
-- 👤 **User filtering** - only re-request items from specific users
+![Python](https://img.shields.io/badge/Python-3.7+-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Overseer](https://img.shields.io/badge/Overseer-Compatible-purple)
 
-## Setup
+## 🚀 Features
 
-1. **Install Python dependencies:**
+- **🔍 Smart Request Querying**: Automatically fetches all requests from your Overseer instance with pagination support
+- **📊 Advanced Analytics**: Detailed breakdowns by status, media type, users, and request patterns over time
+- **🔄 Intelligent Re-requesting**: Triggers downloads on your new server setup with error handling and retries
+- **🛡️ Safe Testing Mode**: Comprehensive dry-run functionality to preview changes before execution
+- **📅 Flexible Date Filtering**: Support for date ranges (before/after) with smart handling of legacy requests
+- **👤 User-Based Filtering**: Target specific users or exclude certain requesters from migration
+- **🎬 Media Type Filtering**: Separate handling for movies vs TV series for staged migrations
+- **⚡ Performance Controls**: Configurable request throttling and batch processing to avoid API overload
+- **🔍 Enhanced Debugging**: Detailed progress tracking and comprehensive error reporting
+- **🧪 Testing Features**: Limit processing to small batches for safe testing and validation
+- **⚙️ Zero-Config Setup**: Simple credential configuration with automatic validation
+- **📈 Migration Analytics**: Success/failure tracking with detailed reporting for large migrations
+
+## 📦 Installation
+
+### Quick Start
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/dannymcc/overseer-rerequester.git
+   cd overseer-rerequester
+   ```
+
+2. **Install Python dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
 
-2. **Configure the script:**
+3. **Configure the script:**
    
    ⚠️ **Important:** The script contains placeholder values. You must update these with your actual Overseer details:
    
@@ -50,10 +67,17 @@ This Python script helps you re-request all items from an Overseer instance. Thi
    INCLUDE_INVALID_DATES = True # Include requests with missing dates
    ```
 
-3. **Get your API token:**
+4. **Get your API token:**
    - Log into your Overseer instance
    - Go to Settings → General → API Key
    - Copy the API key
+
+## 🔧 Requirements
+
+- Python 3.7 or higher
+- Active Overseer instance
+- Valid API token with request permissions
+- Network access to your Overseer server
 
 ## Filtering Options
 
@@ -117,7 +141,7 @@ FILTER_BY_USER = "username"
 # Only movies requested by username between Jan-Dec 2024
 ```
 
-## Usage
+## 🎯 Usage
 
 ### Step 1: Test Connection (Dry Run)
 
@@ -152,21 +176,21 @@ This will:
    ```
 3. Confirm when prompted that you want to proceed
 
-## What This Script Does
+## 📋 What This Script Does
 
 1. **Connects** to your Overseer instance using the API
 2. **Fetches** all requests (movies, TV shows, etc.)
 3. **Analyzes** the requests and shows you statistics
 4. **Re-requests** each item, which should trigger your download clients
 
-## Security Notes
+## 🔒 Security Notes
 
 - 🔐 **Your API token is sensitive** - don't share it publicly or commit it to version control
 - 🛡️ The script defaults to dry run mode for safety
 - 📝 Review the output carefully before enabling live mode
 - 🔒 **For public repositories:** Create a `.env` file or use environment variables for credentials
 
-## Advanced Features
+## ⚡ Advanced Features
 
 ### 🔍 **Debug Mode**
 To see the detailed structure of requests (useful for troubleshooting):
@@ -201,7 +225,7 @@ The script automatically shows:
 - **Detailed sample requests** - with user and date information
 - **Success/failure rates** - Track migration effectiveness
 
-## Troubleshooting
+## 🐛 Troubleshooting
 
 ### Connection Issues
 - Verify your `OVERSEER_URL` is correct (include `https://`)
@@ -232,7 +256,7 @@ During migration, it's normal to see some failures:
 - **Success rates of 40-60%** are typical for older request libraries
 - Failed requests usually represent items that needed cleanup anyway
 
-## Example Output
+## 📄 Example Output
 
 ```
 🎬 Overseer Re-request Script
@@ -293,6 +317,43 @@ During migration, it's normal to see some failures:
       Request ID: 456
 ```
 
-## License
+## 🤝 Contributing
 
-This script is provided as-is for personal use. Use at your own risk. 
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+### Development Setup
+1. Fork this repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Test thoroughly with your Overseer instance
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+### Guidelines
+- Test your changes with both dry-run and live modes
+- Update documentation for new features
+- Follow existing code style and patterns
+- Add appropriate error handling
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [Overseer](https://overseerr.dev/) team for creating an amazing media request management tool
+- The Plex, Radarr, and Sonarr communities for building the ecosystem this tool supports
+- Contributors and testers who helped improve this script
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/dannymcc/overseer-rerequester/issues)
+- **Documentation**: This README and inline code comments
+- **Community**: [Overseer Discord](https://discord.gg/PkCWJSeCk7) for general Overseer support
+
+---
+
+**Made with ❤️ by [Danny McClelland](https://github.com/dannymcc)**
+
+*Not officially affiliated with Overseer or the *arr applications.* 
