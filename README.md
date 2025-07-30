@@ -43,8 +43,11 @@ This Python script helps you re-request all items from an Overseer instance. Thi
    TEST_LIMIT = None
    
    # Optional filtering (set to None to disable)
-   FILTER_BEFORE_DATE = None  # Example: "2024-01-01"
-   FILTER_BY_USER = None      # Example: "username" or 123
+   FILTER_BEFORE_DATE = None   # Example: "2024-12-31"
+   FILTER_AFTER_DATE = None    # Example: "2024-01-01"
+   FILTER_MEDIA_TYPE = None    # Example: "movie" or "tv"
+   FILTER_BY_USER = None       # Example: "username" or 123
+   INCLUDE_INVALID_DATES = True # Include requests with missing dates
    ```
 
 3. **Get your API token:**
@@ -57,16 +60,23 @@ This Python script helps you re-request all items from an Overseer instance. Thi
 The script supports powerful filtering to help you selectively re-request items:
 
 ### 📅 **Date Filtering**
-Only re-request items requested before a specific date:
+Filter requests by date range:
 
 ```python
-FILTER_BEFORE_DATE = "2024-12-31"  # Only requests from before this date
+FILTER_BEFORE_DATE = "2024-12-31"  # Only requests before this date
+FILTER_AFTER_DATE = "2024-01-01"   # Only requests after this date
+# Combine both for a date range (Jan 1 - Dec 31, 2024)
 ```
 
 **Use cases:**
-- Migrate only older requests before your server change
+- Migrate only requests from a specific time period
 - Exclude recent requests that might already be processing
-- Re-request items from a specific time period
+- Re-request items from before your server migration
+- Process requests in chronological batches
+
+**Date Handling:**
+- Requests with missing/invalid dates are included by default
+- Set `INCLUDE_INVALID_DATES = False` to exclude them
 
 ### 👤 **User Filtering**
 Only re-request items from specific users:
@@ -82,13 +92,29 @@ FILTER_BY_USER = "user@example.com"   # By email address
 - Re-request items from users who had issues
 - Exclude admin test requests
 
-### 🔗 **Combined Filtering**
-You can use both filters together:
+### 🎬 **Media Type Filtering**
+Only re-request specific types of content:
 
 ```python
+FILTER_MEDIA_TYPE = "movie"  # Only movies
+FILTER_MEDIA_TYPE = "tv"     # Only TV shows
+FILTER_MEDIA_TYPE = None     # Both movies and TV (default)
+```
+
+**Use cases:**
+- Migrate movies and TV shows separately
+- Test migration with only one content type first
+- Different handling for movies vs TV series
+
+### 🔗 **Combined Filtering**
+You can combine multiple filters:
+
+```python
+FILTER_AFTER_DATE = "2024-01-01"
 FILTER_BEFORE_DATE = "2024-12-01"
+FILTER_MEDIA_TYPE = "movie"
 FILTER_BY_USER = "username"
-# Only re-requests from username before Dec 1, 2024
+# Only movies requested by username between Jan-Dec 2024
 ```
 
 ## Usage
@@ -191,6 +217,8 @@ The script automatically shows:
 - **Date format**: Use YYYY-MM-DD format (e.g., "2024-12-31")
 - **User matching**: The script checks display name, email, and user ID
 - **No matches**: Check the user analysis section to see available users
+- **Missing dates**: Old requests may have invalid dates - enable `INCLUDE_INVALID_DATES = True`
+- **Media types**: Use exact values "movie" or "tv" (case-insensitive)
 
 ### Re-request Failures
 - Some items might already be requested/available
@@ -213,8 +241,11 @@ During migration, it's normal to see some failures:
 🌐 Overseer URL: https://your-overseer-instance.com
 
 🔽 Active Filters:
-   📅 Date: Only requests before 2024-12-01
-   👤 User: Only requests by username
+   📅 Before: 2024-12-01
+   📅 After: 2024-01-01
+   🎬 Media type: movie
+   👤 User: username
+   ⚠️  Invalid dates: included
 
 ✅ Connected to Overseer successfully!
    Version: 1.34.0
@@ -224,21 +255,30 @@ During migration, it's normal to see some failures:
    Page 2: Found 23 requests
 📊 Total requests found: 73
 
-🔽 Filtered: 73 → 45 requests
-   📅 Date filter: before 2024-12-01
-   👤 User filter: username
+🔽 Filtered: 73 → 25 requests
+   📅 Before: 2024-12-01
+   📅 After: 2024-01-01
+   🎬 Media type: movie
+   👤 User: username
+
+📊 Filtering breakdown:
+   🗓️  Date filtered: 30
+   ⚠️  Invalid dates: 5 (included)
+   🎬 Media filtered: 8
+   👤 User filtered: 5
+   ✅ Included: 25
 
 📈 Request Analysis:
    Status breakdown:
-     2: 42
+     2: 22
      4: 3
 
    Media type breakdown:
-     movie: 35
-     tv: 10
+     movie: 25
+     tv: 0
 
    👤 Top requesting users:
-     username (ID: 1): 45 requests
+     username (ID: 1): 25 requests
 
    📅 Requests by month:
      2024-08: 5 requests

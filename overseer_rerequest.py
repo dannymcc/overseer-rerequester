@@ -33,8 +33,17 @@ TEST_LIMIT = None
 # Filter by date - only re-request items requested before this date (YYYY-MM-DD format)
 FILTER_BEFORE_DATE = None  # Example: "2024-01-01"
 
+# Filter by date - only re-request items requested after this date (YYYY-MM-DD format)
+FILTER_AFTER_DATE = None   # Example: "2023-01-01"
+
+# Filter by media type - set to "movie", "tv", or None for both
+FILTER_MEDIA_TYPE = None   # Example: "movie" or "tv"
+
 # Filter by user - only re-request items requested by specific user ID or email
-FILTER_BY_USER = None  # Example: 123 or "user@example.com"
+FILTER_BY_USER = None      # Example: 123 or "user@example.com"
+
+# Include requests with missing/invalid dates when date filtering is enabled
+INCLUDE_INVALID_DATES = True
 
 # Set to True to show detailed request structure for debugging
 DEBUG_SHOW_REQUEST_STRUCTURE = False
@@ -132,21 +141,64 @@ class OverseerAPI:
     def filter_requests(self, requests_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Filter requests based on configured criteria"""
         filtered_requests = []
+        debug_stats = {
+            'total': len(requests_list),
+            'date_filtered': 0,
+            'date_invalid': 0,
+            'media_filtered': 0,
+            'user_filtered': 0,
+            'included': 0
+        }
         
         for req in requests_list:
-            # Check date filter
-            if FILTER_BEFORE_DATE:
-                try:
-                    created_at_str = req.get('createdAt', '')
-                    if created_at_str:
+            skip_request = False
+            
+            # Check date filters
+            if FILTER_BEFORE_DATE or FILTER_AFTER_DATE:
+                created_at_str = req.get('createdAt', '')
+                request_date = None
+                
+                if created_at_str:
+                    try:
                         # Parse the ISO datetime string
-                        created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
-                        filter_date = datetime.fromisoformat(f"{FILTER_BEFORE_DATE}T00:00:00+00:00")
-                        
-                        if created_at >= filter_date:
-                            continue  # Skip this request - it's after the filter date
-                except (ValueError, TypeError) as e:
-                    print(f"⚠️  Warning: Could not parse date for request {req.get('id', 'unknown')}: {e}")
+                        request_date = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+                    except (ValueError, TypeError) as e:
+                        debug_stats['date_invalid'] += 1
+                        if not INCLUDE_INVALID_DATES:
+                            print(f"⚠️  Skipping request {req.get('id', 'unknown')} - invalid date: {e}")
+                            skip_request = True
+                        else:
+                            print(f"⚠️  Including request {req.get('id', 'unknown')} despite invalid date: {e}")
+                else:
+                    debug_stats['date_invalid'] += 1
+                    if not INCLUDE_INVALID_DATES:
+                        print(f"⚠️  Skipping request {req.get('id', 'unknown')} - missing date")
+                        skip_request = True
+                    else:
+                        print(f"⚠️  Including request {req.get('id', 'unknown')} despite missing date")
+                
+                # Apply date filters if we have a valid date
+                if request_date and not skip_request:
+                    if FILTER_BEFORE_DATE:
+                        filter_before = datetime.fromisoformat(f"{FILTER_BEFORE_DATE}T23:59:59+00:00")
+                        if request_date > filter_before:
+                            debug_stats['date_filtered'] += 1
+                            skip_request = True
+                    
+                    if FILTER_AFTER_DATE and not skip_request:
+                        filter_after = datetime.fromisoformat(f"{FILTER_AFTER_DATE}T00:00:00+00:00")
+                        if request_date < filter_after:
+                            debug_stats['date_filtered'] += 1
+                            skip_request = True
+            
+            if skip_request:
+                continue
+            
+            # Check media type filter
+            if FILTER_MEDIA_TYPE:
+                media_type = req.get('type', '')
+                if media_type.lower() != FILTER_MEDIA_TYPE.lower():
+                    debug_stats['media_filtered'] += 1
                     continue
             
             # Check user filter
@@ -161,18 +213,34 @@ class OverseerAPI:
                     if (str(FILTER_BY_USER) != str(user_id) and 
                         str(FILTER_BY_USER).lower() != user_email.lower() and
                         str(FILTER_BY_USER).lower() != user_name.lower()):
-                        continue  # Skip this request - doesn't match user filter
+                        debug_stats['user_filtered'] += 1
+                        continue
                 else:
-                    continue  # Skip requests without user info when filtering by user
+                    debug_stats['user_filtered'] += 1
+                    continue
             
+            debug_stats['included'] += 1
             filtered_requests.append(req)
         
-        if FILTER_BEFORE_DATE or FILTER_BY_USER:
-            print(f"\n🔽 Filtered: {len(requests_list)} → {len(filtered_requests)} requests")
+        # Display filtering summary
+        any_filters_active = any([FILTER_BEFORE_DATE, FILTER_AFTER_DATE, FILTER_MEDIA_TYPE, FILTER_BY_USER])
+        if any_filters_active:
+            print(f"\n🔽 Filtered: {debug_stats['total']} → {debug_stats['included']} requests")
             if FILTER_BEFORE_DATE:
-                print(f"   📅 Date filter: before {FILTER_BEFORE_DATE}")
+                print(f"   📅 Before: {FILTER_BEFORE_DATE}")
+            if FILTER_AFTER_DATE:
+                print(f"   📅 After: {FILTER_AFTER_DATE}")
+            if FILTER_MEDIA_TYPE:
+                print(f"   🎬 Media type: {FILTER_MEDIA_TYPE}")
             if FILTER_BY_USER:
-                print(f"   👤 User filter: {FILTER_BY_USER}")
+                print(f"   👤 User: {FILTER_BY_USER}")
+            
+            print(f"\n📊 Filtering breakdown:")
+            print(f"   🗓️  Date filtered: {debug_stats['date_filtered']}")
+            print(f"   ⚠️  Invalid dates: {debug_stats['date_invalid']} ({'included' if INCLUDE_INVALID_DATES else 'excluded'})")
+            print(f"   🎬 Media filtered: {debug_stats['media_filtered']}")
+            print(f"   👤 User filtered: {debug_stats['user_filtered']}")
+            print(f"   ✅ Included: {debug_stats['included']}")
         
         return filtered_requests
     
@@ -315,12 +383,19 @@ def main():
     print(f"🌐 Overseer URL: {OVERSEER_URL}")
     
     # Show active filters
-    if FILTER_BEFORE_DATE or FILTER_BY_USER:
+    any_filters_active = any([FILTER_BEFORE_DATE, FILTER_AFTER_DATE, FILTER_MEDIA_TYPE, FILTER_BY_USER])
+    if any_filters_active:
         print("\n🔽 Active Filters:")
         if FILTER_BEFORE_DATE:
-            print(f"   📅 Date: Only requests before {FILTER_BEFORE_DATE}")
+            print(f"   📅 Before: {FILTER_BEFORE_DATE}")
+        if FILTER_AFTER_DATE:
+            print(f"   📅 After: {FILTER_AFTER_DATE}")
+        if FILTER_MEDIA_TYPE:
+            print(f"   🎬 Media type: {FILTER_MEDIA_TYPE}")
         if FILTER_BY_USER:
-            print(f"   👤 User: Only requests by {FILTER_BY_USER}")
+            print(f"   👤 User: {FILTER_BY_USER}")
+        if FILTER_BEFORE_DATE or FILTER_AFTER_DATE:
+            print(f"   ⚠️  Invalid dates: {'included' if INCLUDE_INVALID_DATES else 'excluded'}")
     
     print()
     
