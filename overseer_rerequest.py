@@ -323,11 +323,16 @@ class OverseerAPI:
             print(f"      Request ID: {req.get('id', 'unknown')}")
             print()
     
-    def create_request(self, media_id: int, media_type: str, title: str = "Unknown Title") -> bool:
-        """Create a new request for the specified media"""
+    def create_request(self, media_id: int, media_type: str, title: str = "Unknown Title") -> tuple[bool, Optional[str]]:
+        """
+        Create a new request for the specified media.
+        
+        Returns:
+            tuple: (success: bool, error_detail: str or None)
+        """
         if DRY_RUN:
             print(f"   [DRY RUN] Would re-request {media_type} with media ID: {media_id}")
-            return True
+            return True, None
         
         try:
             payload = {
@@ -342,7 +347,7 @@ class OverseerAPI:
             
             if response.status_code in [200, 201]:
                 print(f"   ✅ Successfully re-requested {media_type} (ID: {media_id})")
-                return True
+                return True, None
             else:
                 # Try to get more detailed error info
                 error_detail = "Unknown error"
@@ -352,13 +357,15 @@ class OverseerAPI:
                 except:
                     error_detail = response.text[:100] if response.text else "No error details"
                 
+                full_error = f"HTTP {response.status_code}: {error_detail}"
                 print(f"   ❌ Failed to re-request {media_type} '{title}' (ID: {media_id})")
-                print(f"      HTTP {response.status_code}: {error_detail}")
-                return False
+                print(f"      {full_error}")
+                return False, full_error
                 
         except Exception as e:
-            print(f"   ❌ Error re-requesting {media_type} '{title}' (ID: {media_id}): {e}")
-            return False
+            error_detail = str(e)
+            print(f"   ❌ Error re-requesting {media_type} '{title}' (ID: {media_id}): {error_detail}")
+            return False, error_detail
 
 def main():
     print("🎬 Overseer Re-request Script")
@@ -458,6 +465,7 @@ def main():
     
     success_count = 0
     failed_count = 0
+    failed_items = []  # Track failed items with details
     
     for i, req in enumerate(requests_to_process, 1):
         media_info = req.get('media', {})
@@ -467,10 +475,17 @@ def main():
         
         if media_id:
             print(f"Processing {i}/{len(requests_to_process)}: {title}")
-            if api.create_request(media_id, media_type, title):
+            success, error = api.create_request(media_id, media_type, title)
+            if success:
                 success_count += 1
             else:
                 failed_count += 1
+                failed_items.append({
+                    'title': title,
+                    'media_id': media_id,
+                    'media_type': media_type,
+                    'error': error or 'Unknown error'
+                })
                 
             # Add delay between requests to avoid overwhelming the API (except in dry run)
             if not DRY_RUN and i < len(requests_to_process):
@@ -478,6 +493,12 @@ def main():
         else:
             print(f"⚠️  Skipping {title}: No media ID found")
             failed_count += 1
+            failed_items.append({
+                'title': title,
+                'media_id': None,
+                'media_type': media_type,
+                'error': 'No media ID found in request data'
+            })
     
     print(f"\n📊 Re-request Summary:")
     print(f"   ✅ Successful: {success_count}")
@@ -485,6 +506,36 @@ def main():
     print(f"   📝 Total processed: {len(requests_to_process)}")
     if TEST_LIMIT is not None:
         print(f"   🧪 Test mode: Only processed first {TEST_LIMIT} of {len(filtered_requests)} total requests")
+    
+    # Print detailed failure report if there were failures
+    if failed_items:
+        print(f"\n❌ Failed Items Report ({len(failed_items)} items):")
+        print("-" * 60)
+        for item in failed_items:
+            print(f"   • [{item['media_type'].upper()}] {item['title']}")
+            print(f"     Media ID: {item['media_id'] or 'N/A'}")
+            print(f"     Error: {item['error']}")
+            print()
+        
+        # Categorize failures by error type
+        error_categories = {}
+        for item in failed_items:
+            # Extract the main error type
+            error = item['error']
+            if 'TMDB' in error or '404' in error:
+                category = 'TMDB lookup failed (media may be deleted)'
+            elif 'No media ID' in error:
+                category = 'Missing media ID in request data'
+            elif 'HTTP 500' in error:
+                category = 'Server error (Overseer issue)'
+            else:
+                category = 'Other errors'
+            
+            error_categories[category] = error_categories.get(category, 0) + 1
+        
+        print("📈 Failure Breakdown:")
+        for category, count in sorted(error_categories.items(), key=lambda x: -x[1]):
+            print(f"   • {category}: {count}")
 
 if __name__ == "__main__":
     main() 
