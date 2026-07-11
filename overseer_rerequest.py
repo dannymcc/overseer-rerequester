@@ -42,6 +42,9 @@ FILTER_MEDIA_TYPE = None   # Example: "movie" or "tv"
 # Filter by user - only re-request items requested by specific user ID or email
 FILTER_BY_USER = None      # Example: 123 or "user@example.com"
 
+# Only re-request items that are missing from Radarr/Sonarr (externalServiceId and externalServiceId4k are both None/null)
+FILTER_ONLY_MISSING_IN_SERVICES = False
+
 # Include requests with missing/invalid dates when date filtering is enabled
 INCLUDE_INVALID_DATES = True
 
@@ -57,6 +60,34 @@ class OverseerAPI:
             'X-API-Key': token,
             'Content-Type': 'application/json'
         })
+        self._title_cache = {}
+        
+    def get_media_title(self, tmdb_id: int, media_type: str) -> str:
+        """Fetch human-readable title for a given tmdb_id and media_type with caching"""
+        if not tmdb_id:
+            return "Unknown Title"
+            
+        cache_key = (media_type, tmdb_id)
+        if cache_key in self._title_cache:
+            return self._title_cache[cache_key]
+            
+        try:
+            endpoint = f"/api/v1/{media_type}/{tmdb_id}"
+            response = self.session.get(f"{self.base_url}{endpoint}")
+            if response.status_code == 200:
+                data = response.json()
+                if media_type == 'movie':
+                    title = data.get('title') or data.get('originalTitle') or "Unknown Movie"
+                elif media_type == 'tv':
+                    title = data.get('name') or data.get('originalName') or "Unknown TV Show"
+                else:
+                    title = "Unknown Title"
+                self._title_cache[cache_key] = title
+                return title
+        except Exception:
+            pass
+            
+        return "Unknown Title"
     
     def test_connection(self) -> bool:
         """Test if we can connect to the Overseer API"""
@@ -147,6 +178,7 @@ class OverseerAPI:
             'date_invalid': 0,
             'media_filtered': 0,
             'user_filtered': 0,
+            'service_filtered': 0,
             'included': 0
         }
         
@@ -218,12 +250,19 @@ class OverseerAPI:
                 else:
                     debug_stats['user_filtered'] += 1
                     continue
+            # Check if missing from external services (Radarr/Sonarr)
+            if FILTER_ONLY_MISSING_IN_SERVICES:
+                media_info = req.get('media') or {}
+                if (media_info.get('externalServiceId') is not None or 
+                    media_info.get('externalServiceId4k') is not None):
+                    debug_stats['service_filtered'] += 1
+                    continue
             
             debug_stats['included'] += 1
             filtered_requests.append(req)
         
         # Display filtering summary
-        any_filters_active = any([FILTER_BEFORE_DATE, FILTER_AFTER_DATE, FILTER_MEDIA_TYPE, FILTER_BY_USER])
+        any_filters_active = any([FILTER_BEFORE_DATE, FILTER_AFTER_DATE, FILTER_MEDIA_TYPE, FILTER_BY_USER, FILTER_ONLY_MISSING_IN_SERVICES])
         if any_filters_active:
             print(f"\n🔽 Filtered: {debug_stats['total']} → {debug_stats['included']} requests")
             if FILTER_BEFORE_DATE:
@@ -234,12 +273,15 @@ class OverseerAPI:
                 print(f"   🎬 Media type: {FILTER_MEDIA_TYPE}")
             if FILTER_BY_USER:
                 print(f"   👤 User: {FILTER_BY_USER}")
+            if FILTER_ONLY_MISSING_IN_SERVICES:
+                print(f"   📡 Only missing in services: Yes")
             
             print(f"\n📊 Filtering breakdown:")
             print(f"   🗓️  Date filtered: {debug_stats['date_filtered']}")
             print(f"   ⚠️  Invalid dates: {debug_stats['date_invalid']} ({'included' if INCLUDE_INVALID_DATES else 'excluded'})")
             print(f"   🎬 Media filtered: {debug_stats['media_filtered']}")
             print(f"   👤 User filtered: {debug_stats['user_filtered']}")
+            print(f"   📡 Service filtered (has Radarr/Sonarr ID): {debug_stats['service_filtered']}")
             print(f"   ✅ Included: {debug_stats['included']}")
         
         return filtered_requests
@@ -304,9 +346,11 @@ class OverseerAPI:
         print("\n📋 Sample requests:")
         for i, req in enumerate(requests_list[:5]):
             media_info = req.get('media', {})
-            title = media_info.get('title', 'Unknown Title')
-            status = req.get('status', 'unknown')
             req_type = req.get('type', 'unknown')
+            tmdb_id = media_info.get('tmdbId')
+            title = self.get_media_title(tmdb_id, req_type)
+            
+            status = req.get('status', 'unknown')
             created_at = req.get('createdAt', 'unknown')
             
             # User info
@@ -390,7 +434,7 @@ def main():
     print(f"🌐 Overseer URL: {OVERSEER_URL}")
     
     # Show active filters
-    any_filters_active = any([FILTER_BEFORE_DATE, FILTER_AFTER_DATE, FILTER_MEDIA_TYPE, FILTER_BY_USER])
+    any_filters_active = any([FILTER_BEFORE_DATE, FILTER_AFTER_DATE, FILTER_MEDIA_TYPE, FILTER_BY_USER, FILTER_ONLY_MISSING_IN_SERVICES])
     if any_filters_active:
         print("\n🔽 Active Filters:")
         if FILTER_BEFORE_DATE:
@@ -401,6 +445,8 @@ def main():
             print(f"   🎬 Media type: {FILTER_MEDIA_TYPE}")
         if FILTER_BY_USER:
             print(f"   👤 User: {FILTER_BY_USER}")
+        if FILTER_ONLY_MISSING_IN_SERVICES:
+            print(f"   📡 Only missing in services: Yes")
         if FILTER_BEFORE_DATE or FILTER_AFTER_DATE:
             print(f"   ⚠️  Invalid dates: {'included' if INCLUDE_INVALID_DATES else 'excluded'}")
     
@@ -469,9 +515,10 @@ def main():
     
     for i, req in enumerate(requests_to_process, 1):
         media_info = req.get('media', {})
-        media_id = media_info.get('id')
+        media_id = media_info.get('tmdbId') or media_info.get('id')
         media_type = req.get('type', 'movie')  # Default to movie
-        title = media_info.get('title', 'Unknown Title')
+        tmdb_id = media_info.get('tmdbId')
+        title = api.get_media_title(tmdb_id, media_type)
         
         if media_id:
             print(f"Processing {i}/{len(requests_to_process)}: {title}")
