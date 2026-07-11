@@ -64,6 +64,7 @@ A Python script that helps you re-request all items from an Overseer instance wi
    FILTER_AFTER_DATE = None    # Example: "2024-01-01"
    FILTER_MEDIA_TYPE = None    # Example: "movie" or "tv"
    FILTER_BY_USER = None       # Example: "username" or 123
+   FILTER_ONLY_MISSING_IN_SERVICES = False # Only re-request items missing from Radarr/Sonarr
    INCLUDE_INVALID_DATES = True # Include requests with missing dates
    ```
 
@@ -129,6 +130,13 @@ FILTER_MEDIA_TYPE = None     # Both movies and TV (default)
 - Migrate movies and TV shows separately
 - Test migration with only one content type first
 - Different handling for movies vs TV series
+
+### 📡 **Service Presence Filtering**
+Only re-request items that do not exist in your Radarr/Sonarr services (i.e., their external service IDs are not yet synced or are missing):
+
+```python
+FILTER_ONLY_MISSING_IN_SERVICES = True  # Only re-request items missing in Radarr/Sonarr
+```
 
 ### 🔗 **Combined Filtering**
 You can combine multiple filters:
